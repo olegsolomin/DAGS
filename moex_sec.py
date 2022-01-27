@@ -16,8 +16,8 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 #from sqlalchemy.ext.declarative import declarative_base
-from urllib.request import urlopen
-import json
+#from urllib.request import urlopen
+#import json
 
 #variables
 secrets = fmsb.secrets()
@@ -50,17 +50,16 @@ def _check_table():
 def sql_create_stm():
     target_table = "ISS_MOEX_SECURITIES"
     address = 'https://iss.moex.com/iss/securities.json'
-    data = urlopen(address)
-    text = json.loads(data.read().decode())
-    columnes=text['securities']['columns']
+    data = pd.read_json(address)
+    columnes=data['securities']['columns']
     type=[]
     for col in columnes:
-        type.append(text['securities']['metadata'][col]['type'])
+        type.append(data['securities']['metadata'][col]['type'])
     type_adj = list(map(lambda item: item.replace("int32","INTEGER").replace("string", "VARCHAR"), type))
     bytes=[]
     for col in columnes:
         try:
-            bytes.append(text['securities']['metadata'][col]['bytes'])
+            bytes.append(data['securities']['metadata'][col]['bytes'])
         except:
             bytes.append(None)
     lst_tuple = list(zip(columnes, type_adj, bytes))
@@ -78,9 +77,8 @@ def create_table(ti):
     start_time = time.time()
     target_table = "ISS_MOEX_SECURITIES"
     address = 'https://iss.moex.com/iss/securities.json'
-    data = urlopen(address)
-    text = json.loads(data.read().decode())
-    columnes=text['securities']['columns']
+    data = pd.read_json(address)
+    columnes=data['securities']['columns']
     sql_create_stm=ti.xcom_pull(task_ids="sql_create_stm")
     log_string = '''INSERT INTO ISS_MOEX_LOG (table_name, db_name, action, time_to_insert, updated_at) VALUES (%s,%s,%s,%s,%s );'''
     with engineFMSB.connect() as conn:
@@ -95,9 +93,8 @@ def _check_columns():
     log_string = '''INSERT INTO ISS_MOEX_LOG (table_name, db_name, action, time_to_insert, updated_at) VALUES (%s,%s,%s,%s,%s );'''
     col_names = pd.read_sql_query(sql=sql_string_check, con=engineFMSB)
     address = 'https://iss.moex.com/iss/securities.json'
-    data = urlopen(address)
-    text = json.loads(data.read().decode())
-    columnes=text['securities']['columns']
+    data = pd.read_json(address)
+    columnes=data['securities']['columns']
     moex_names = pd.DataFrame(columnes,columns = ['MOEX'])
     check_names = pd.merge(col_names, moex_names, left_on="COLUMN_NAME", right_on="MOEX", how="outer")
     check_names['CHECK'] = np.where((check_names['COLUMN_NAME'] == check_names['MOEX']), "ok" , "no")
@@ -120,9 +117,8 @@ def last_page_parse():
     def url_parse(i):
         step=100
         address = 'https://iss.moex.com/iss/securities.json?start=' +str(step*i)
-        data = urlopen(address)
-        text = json.loads(data.read().decode())
-        return (text['securities']['data'])
+        data = pd.read_json(address)
+        return (data['securities']['data'])
     target_table = "ISS_MOEX_SECURITIES"
     start_time = time.time()
     start_page = 0
@@ -134,11 +130,13 @@ def last_page_parse():
         if (url_parse(i) != []):
             start_page = int((max_page+start_page)/2)
             i_count+=1
-            #print("data ok" , i, "step", i_count, "mp", max_page, "sp", start_page)
+##print to XCOM page full of data
+            print("data ok" , i, "step", i_count, "mp", max_page, "sp", start_page)
         elif (url_parse(i) == []):
             max_page=int((max_page+start_page)/2)
             i_count+=1
-            #print("data empty" , i, "step", i_count, "mp", max_page, "sp", start_page)
+## print to XCOM empty page
+            print("data empty" , i, "step", i_count, "mp", max_page, "sp", start_page)
         time_to_load = (time.time() - start_time)
         last_page=i+1
     return(last_page)
@@ -164,9 +162,8 @@ def load_data(ti):
     cnt=0
     for i in range(start_page,last_page):
         address = 'https://iss.moex.com/iss/securities.json?start='+str(step*i)
-        data = urlopen(address)
-        text = json.loads(data.read().decode())
-        loaddata =text['securities']['data']
+        data = pd.read_json(address)
+        loaddata =data['securities']['data']
         vs=[]
         for i in loaddata:
             i.append(datetime.now())
@@ -183,7 +180,7 @@ def load_data(ti):
     return(time_to_load)
 
 # DAG definition
-with DAG('moex_sec', schedule_interval='@daily', default_args=default_args, catchup=False) as dag:
+with DAG('moex_sec', schedule_interval='0 1 * * *', default_args=default_args, catchup=False) as dag:
     check_table = BranchPythonOperator(
     task_id='check_table',
     python_callable=_check_table
