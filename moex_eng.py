@@ -126,7 +126,7 @@ def load_data():
     lst_col_insert = []
     for line in col_names_list:
         lst_col_insert.append(target_table + "." + line)
-    col_string_insert=', '.join(lst_col_insert)   
+    col_string_insert=', '.join(lst_col_insert)
     val_list = (len(col_names_list))*"%s,"
     #create query
     sql_insert  = "REPLACE INTO "+ target_table+" ("+col_string_insert+") VALUES ("+val_list[:-1]+");"
@@ -152,7 +152,11 @@ def load_data():
     return(time_to_load)
 
 # DAG definition
-with DAG('moex_eng', schedule_interval='@daily', default_args=default_args, catchup=False) as dag:
+with DAG('moex_eng',
+          schedule_interval='@daily',
+          default_args=default_args,
+          tags=['moex', 'finmarket'],
+          catchup=False) as dag:
     check_table = BranchPythonOperator(
     task_id='check_table',
     python_callable=_check_table

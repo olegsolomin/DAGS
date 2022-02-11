@@ -143,16 +143,16 @@ def load_data():
     ## loop for every table ## getting combo for tables from table with markets and engines
     markets=pd.read_sql_query(sql='select engine,name from ISS_MOEX_MARKETS;', con=engineFMSB)
     em_tuple = [tuple(x) for x in markets[['engine','name']].to_numpy()]
-    table_to_check=[] ## for DAG XCOM variable - not used here
-    for entry in em_tuple[33:34]:
+    for entry in em_tuple:
         start_time = time.time()
         ## creating table name
         target_table = entry[0]+'_'+entry[1]+'_trades'
-        #max_tradeno=pd.read_sql_query(sql="select max(tradeno) from "+target_table+";", con=engineFMSB)
+        #max_tradeno
         with engineFMSB.connect() as conn:
             max_tradeno=conn.execute("select max(tradeno) from "+target_table+";").fetchone()[0]
         if max_tradeno == None:
             max_tradeno = 0
+        # for sql_string
         sql_string_col = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = '" + target_table + "';"
         col_names = pd.read_sql_query(sql=sql_string_col, con=engineFMSB)
         col_names_list = col_names['COLUMN_NAME'].to_list()
@@ -175,7 +175,6 @@ def load_data():
                 load_data_adj =[]
                 for d in load_data:
                     if d[0]>max_tradeno:
-                        print("TRUE", d)
                         d.append(entry[0])
                         d.append(entry[1])
                         d.append(datetime.now())
@@ -188,13 +187,17 @@ def load_data():
             else:
                 break
         time_to_load = (time.time() - start_time)
-        #print(target_table, total)
+
         with engineFMSB.connect() as conn:
             conn.execute(log_string,(target_table, database, "inserted   " + str(total) + "  row", time_to_load, datetime.now()))
     return(time_to_load)
 
 # DAG definition
-with DAG('moex_trades', schedule_interval='20 */3 * * *', default_args=default_args, catchup=False) as dag:
+with DAG('moex_trades',
+    schedule_interval='20 */4 * * *',
+    default_args=default_args,
+    tags=['moex', 'finmarket'],
+    catchup=False) as dag:
     check_table = PythonOperator(
     task_id='check_table',
     python_callable=check_table
@@ -209,7 +212,8 @@ with DAG('moex_trades', schedule_interval='20 */3 * * *', default_args=default_a
     )
     load_data = PythonOperator(
     task_id='load_data',
-    python_callable=load_data
+    python_callable=load_data,
+    trigger_rule=TriggerRule.ALL_SUCCESS
     )
 # TASK pipeline
 check_table >> create_table >> check_columns >> load_data

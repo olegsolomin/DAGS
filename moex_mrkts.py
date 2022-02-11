@@ -162,7 +162,11 @@ def load_data():
     return(time_to_load)
 
 # DAG definition
-with DAG('moex_mrkts', schedule_interval='@daily', default_args=default_args, catchup=False) as dag:
+with DAG('moex_mrkts',
+         schedule_interval='@daily',
+         default_args=default_args,
+         tags=['moex', 'finmarket'],
+         catchup=False) as dag:
     check_table = BranchPythonOperator(
     task_id='check_table',
     python_callable=_check_table

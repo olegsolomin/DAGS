@@ -76,7 +76,8 @@ def load_data_cbratetoday():
 with DAG('cb_today',
     description='A simple DAG made by SON to update TODAYs rates of CBR',
     default_args=default_args,
-    schedule_interval="45 */8 * * *") as dag:
+    tags=['cbr', 'finmarket'],
+    schedule_interval="45 */12 * * *") as dag:
     create_table_cbratetoday = PythonOperator(
         task_id='create_table_cbratetoday',
         python_callable=create_table_cbratetoday,

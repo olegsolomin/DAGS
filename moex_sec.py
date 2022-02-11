@@ -180,7 +180,11 @@ def load_data(ti):
     return(time_to_load)
 
 # DAG definition
-with DAG('moex_sec', schedule_interval='0 1 * * *', default_args=default_args, catchup=False) as dag:
+with DAG('moex_sec',
+          schedule_interval='0 1 * * *',
+          default_args=default_args,
+          tags=['moex', 'finmarket'],
+          catchup=False) as dag:
     check_table = BranchPythonOperator(
     task_id='check_table',
     python_callable=_check_table

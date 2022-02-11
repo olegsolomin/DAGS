@@ -92,6 +92,7 @@ def load_data_cbratedaily():
 with DAG('cb_daily',
     description='DAG made by SON to get daily rates of CBR',
     default_args=default_args,
+    tags=['cbr', 'finmarket'],
     schedule_interval="45 */12 * * *") as dag:
     create_table_cbratedaily = PythonOperator(
         task_id='create_table_cbratedaily',
